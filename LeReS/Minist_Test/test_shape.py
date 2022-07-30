@@ -100,7 +100,7 @@ if __name__ == '__main__':
     focal_model.cuda()
 
     # image_dir = os.path.dirname(os.path.dirname(__file__)) + '/test_images/'
-    image_dir = os.path.dirname(__file__) + '/test_images/'
+    image_dir = '/share/wenzhuoliu/code/AdelaiDepth-lwz/LeReS/Minist_Test/test_images/'
     imgs_list = os.listdir(image_dir)
     imgs_list.sort()
     imgs_path = [os.path.join(image_dir, i) for i in imgs_list if i != 'outputs']
