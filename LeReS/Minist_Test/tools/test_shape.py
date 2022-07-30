@@ -136,4 +136,13 @@ if __name__ == '__main__':
         cv2.imwrite(os.path.join(image_dir_out, img_name[:-4]+'.png'), disp)
 
         # reconstruct point cloud from the depth
+
+        # add obj-mask
+        import json
+
+        detection_path='/share/wenzhuoliu/code/AdelaiDepth-lwz/LeReS/Minist_Test/detections.json'
+        with open(detection_path, 'r') as file:
+            detections = json.load(file)
+        obj_mask=detections[0]['mask']
+        depth_scaleinv[obj_mask]=0
         reconstruct_depth(depth_scaleinv, rgb[:, :, ::-1], image_dir_out, img_name[:-4]+'-pcd', focal=focal_length)
