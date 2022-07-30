@@ -145,5 +145,5 @@ if __name__ == '__main__':
         with open(detection_path, 'r') as file:
             detections = json.load(file)
         obj_mask=detections[0]['mask']
-        depth_scaleinv[obj_mask]=0
+        depth_scaleinv[not obj_mask]=0
         reconstruct_depth(depth_scaleinv, rgb[:, :, ::-1], image_dir_out, img_name[:-4]+'-pcd', focal=focal_length)
