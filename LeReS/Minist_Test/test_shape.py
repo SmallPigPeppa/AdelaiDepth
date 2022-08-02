@@ -155,6 +155,7 @@ if __name__ == '__main__':
         with open(detection_path, 'r') as file:
             detections = json.load(file)
         import copy
+        reconstruct_depth(depth_scaleinv, rgb[:, :, ::-1], image_dir_out, img_name[:-4] + '-pcd', focal=focal_length)
         for i,detections_i in enumerate(detections):
             obj_mask=detections_i['mask']
             # obj_mask=[not elem for elem in obj_mask]
