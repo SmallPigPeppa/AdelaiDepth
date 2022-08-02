@@ -162,4 +162,4 @@ if __name__ == '__main__':
             tmp_depth=copy.deepcopy(depth_scaleinv)
             tmp_depth[obj_mask]=0
             depth_scaleinv = depth_scaleinv-tmp_depth
-            reconstruct_depth(depth_scaleinv, rgb[:, :, ::-1], image_dir_out, img_name[:-4]+'-pcd'+f'obj{i}', focal=focal_length)
+            reconstruct_depth(depth_scaleinv, rgb[:, :, ::-1], image_dir_out, img_name[:-4]+'-pcd'+f'-obj{i}', focal=focal_length)
