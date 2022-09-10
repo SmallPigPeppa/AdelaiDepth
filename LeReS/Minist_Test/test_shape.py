@@ -12,6 +12,7 @@ from lib.net_tools import load_ckpt
 from lib.spvcnn_classsification import SPVCNN_CLASSIFICATION
 from lib.test_utils import reconstruct_depth
 
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Configs for LeReS')
@@ -20,6 +21,7 @@ def parse_args():
 
     args = parser.parse_args()
     return args
+
 
 def scale_torch(img):
     """
@@ -32,12 +34,13 @@ def scale_torch(img):
         img = img[np.newaxis, :, :]
     if img.shape[2] == 3:
         transform = transforms.Compose([transforms.ToTensor(),
-		                                transforms.Normalize((0.485, 0.456, 0.406) , (0.229, 0.224, 0.225) )])
+                                        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
         img = transform(img)
     else:
         img = img.astype(np.float32)
         img = torch.from_numpy(img)
     return img
+
 
 def make_shift_focallength_models():
     shift_model = SPVCNN_CLASSIFICATION(input_channel=3,
@@ -56,6 +59,7 @@ def make_shift_focallength_models():
     focal_model.eval()
     return shift_model, focal_model
 
+
 def reconstruct3D_from_depth(rgb, pred_depth, shift_model, focal_model):
     cam_u0 = rgb.shape[1] / 2.0
     cam_v0 = rgb.shape[0] / 2.0
@@ -65,7 +69,7 @@ def reconstruct3D_from_depth(rgb, pred_depth, shift_model, focal_model):
     pred_depth_norm = pred_depth_norm / dmax
 
     # proposed focal length, FOV is 60', Note that 60~80' are acceptable.
-    proposed_scaled_focal = (rgb.shape[0] // 2 / np.tan((60/2.0)*np.pi/180))
+    proposed_scaled_focal = (rgb.shape[0] // 2 / np.tan((60 / 2.0) * np.pi / 180))
 
     # recover focal
     focal_scale_1 = refine_focal(pred_depth_norm, proposed_scaled_focal, focal_model, u0=cam_u0, v0=cam_v0)
@@ -81,6 +85,7 @@ def reconstruct3D_from_depth(rgb, pred_depth, shift_model, focal_model):
     predicted_focal_2 = predicted_focal_1 / focal_scale_2.item()
 
     return shift_1, predicted_focal_2, depth_scale_1
+
 
 if __name__ == '__main__':
 
@@ -113,7 +118,7 @@ if __name__ == '__main__':
         rgb_c = rgb[:, :, ::-1].copy()
         gt_depth = None
         A_resize = cv2.resize(rgb_c, (448, 448))
-        rgb_half = cv2.resize(rgb, (rgb.shape[1]//2, rgb.shape[0]//2), interpolation=cv2.INTER_LINEAR)
+        rgb_half = cv2.resize(rgb, (rgb.shape[1] // 2, rgb.shape[0] // 2), interpolation=cv2.INTER_LINEAR)
 
         img_torch = scale_torch(A_resize)[None, :, :, :]
         pred_depth = depth_model.inference(img_torch).cpu().numpy().squeeze()
@@ -126,15 +131,16 @@ if __name__ == '__main__':
         disp = (disp / disp.max() * 60000).astype(np.uint16)
 
         # if GT depth is available, uncomment the following part to recover the metric depth
-        #pred_depth_metric = recover_metric_depth(pred_depth_ori, gt_depth)
+        # pred_depth_metric = recover_metric_depth(pred_depth_ori, gt_depth)
 
         img_name = v.split('/')[-1]
         cv2.imwrite(os.path.join(image_dir_out, img_name), rgb)
         # save depth
-        plt.imsave(os.path.join(image_dir_out, img_name[:-4]+'-depth.png'), pred_depth_ori, cmap='rainbow')
-        cv2.imwrite(os.path.join(image_dir_out, img_name[:-4]+'-depth_raw.png'), (pred_depth_ori/pred_depth_ori.max() * 60000).astype(np.uint16))
+        plt.imsave(os.path.join(image_dir_out, img_name[:-4] + '-depth.png'), pred_depth_ori, cmap='rainbow')
+        cv2.imwrite(os.path.join(image_dir_out, img_name[:-4] + '-depth_raw.png'),
+                    (pred_depth_ori / pred_depth_ori.max() * 60000).astype(np.uint16))
         # save disp
-        cv2.imwrite(os.path.join(image_dir_out, img_name[:-4]+'.png'), disp)
+        cv2.imwrite(os.path.join(image_dir_out, img_name[:-4] + '.png'), disp)
 
         # reconstruct point cloud from the depth
 
@@ -151,17 +157,20 @@ if __name__ == '__main__':
         # tmp_depth[obj_mask]=0
         # depth_scaleinv = depth_scaleinv-tmp_depth
         # reconstruct_depth(depth_scaleinv, rgb[:, :, ::-1], image_dir_out, img_name[:-4]+'-pcd', focal=focal_length)
-        detection_path='/share/wenzhuoliu/code/mover-hwy/thirdparty/scene_initialization/prox_qualitative_pointrend_X_101_det_all/MPH11_00034_01_img/detections.json'
+        detection_path = '/share/wenzhuoliu/code/mover-hwy/thirdparty/scene_initialization/prox_qualitative_pointrend_X_101_det_all/MPH11_00034_01_img/detections.json'
+        detection_path = "/share/wenzhuoliu/code/mover-lwz/input-data/Color_flip/images_pointrend_X_101_det_all/000000/detections.json"
         with open(detection_path, 'r') as file:
             detections = json.load(file)
         import copy
+
         reconstruct_depth(depth_scaleinv, rgb[:, :, ::-1], image_dir_out, img_name[:-4] + '-pcd', focal=focal_length)
-        for i,detections_i in enumerate(detections):
-            obj_mask=detections_i['mask']
-            class_name=detections_i['class']
-            if class_name =="person":
+        for i, detections_i in enumerate(detections):
+            obj_mask = detections_i['mask']
+            class_name = detections_i['class']
+            if class_name == "person":
                 # obj_mask=[not elem for elem in obj_mask]
-                tmp_depth=copy.deepcopy(depth_scaleinv)
-                tmp_depth[obj_mask]=0
-                depth_scaleinv = depth_scaleinv-tmp_depth
-                reconstruct_depth(depth_scaleinv, rgb[:, :, ::-1], image_dir_out, img_name[:-4]+'-pcd'+f'-obj-{class_name}', focal=focal_length)
+                tmp_depth = copy.deepcopy(depth_scaleinv)
+                tmp_depth[obj_mask] = 0
+                depth_scaleinv = depth_scaleinv - tmp_depth
+                reconstruct_depth(depth_scaleinv, rgb[:, :, ::-1], image_dir_out,
+                                  img_name[:-4] + '-pcd' + f'-obj-{class_name}', focal=focal_length)
