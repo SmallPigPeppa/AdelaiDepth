@@ -158,8 +158,10 @@ if __name__ == '__main__':
         reconstruct_depth(depth_scaleinv, rgb[:, :, ::-1], image_dir_out, img_name[:-4] + '-pcd', focal=focal_length)
         for i,detections_i in enumerate(detections):
             obj_mask=detections_i['mask']
-            # obj_mask=[not elem for elem in obj_mask]
-            tmp_depth=copy.deepcopy(depth_scaleinv)
-            tmp_depth[obj_mask]=0
-            depth_scaleinv = depth_scaleinv-tmp_depth
-            reconstruct_depth(depth_scaleinv, rgb[:, :, ::-1], image_dir_out, img_name[:-4]+'-pcd'+f'-obj{i}', focal=focal_length)
+            class_name=detections_i['class']
+            if class_name =="person":
+                # obj_mask=[not elem for elem in obj_mask]
+                tmp_depth=copy.deepcopy(depth_scaleinv)
+                tmp_depth[obj_mask]=0
+                depth_scaleinv = depth_scaleinv-tmp_depth
+                reconstruct_depth(depth_scaleinv, rgb[:, :, ::-1], image_dir_out, img_name[:-4]+'-pcd'+f'-obj-{class_name}', focal=focal_length)
