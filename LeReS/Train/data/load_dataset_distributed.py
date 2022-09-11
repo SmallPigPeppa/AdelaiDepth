@@ -222,6 +222,7 @@ def create_multiple_dataset(opt):
     dataset_indices_lists = []
     indices_len = []
     for name in opt.dataset_list:
+        # parser.add_argument('--dataset', default='multi', help='Dataset loader name')
         dataset = find_dataset_lib(opt.dataset)(opt, name)
         #dataset.initialize(opt, name)
         logger.info("%s : %s is loaded, the data size is %d" % (opt.phase, name, len(dataset)))
