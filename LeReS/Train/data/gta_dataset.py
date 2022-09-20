@@ -4,6 +4,7 @@ import json
 import cv2
 import numpy as np
 import torch
+import pickle
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 from PIL import Image
@@ -12,67 +13,65 @@ from imgaug import augmenters as iaa
 from lib.configs.config import cfg
 
 
+def read_depthmap(name, cam_near_clip, cam_far_clip):
+    depth = cv2.imread(name)
+    depth = np.concatenate(
+        (depth, np.zeros_like(depth[:, :, 0:1], dtype=np.uint8)), axis=2
+    )
+    depth.dtype = np.uint32
+    depth = 0.05 * 1000 / depth.astype('float')
+    depth = (
+            cam_near_clip
+            * cam_far_clip
+            / (cam_near_clip + depth * (cam_far_clip - cam_near_clip))
+    )
+    return depth
+
+
 class GTADataset(Dataset):
     def __init__(self, opt, dataset_name=None):
         super(GTADataset, self).__init__()
         self.opt = opt
         self.root = opt.dataroot
         self.dataset_name = dataset_name
-        self.dir_anno = os.path.join(cfg.ROOT_DIR,
-                                     opt.dataroot,
-                                     dataset_name,
-                                     'annotations',
-                                     opt.phase_anno + '_annotations.json')
-        self.dir_teacher_list = None
-        self.rgb_paths, self.depth_paths, self.disp_paths, self.sem_masks, self.ins_paths, self.all_annos, self.curriculum_list = self.getData()
-        self.data_size = len(self.all_annos)
+        self.rgb_paths, self.depth_paths, self.mask_paths, self.cam_near_clips, self.cam_far_clips, self.info_pkl, self.info_npz = self.getData()
+        self.data_size = len(self.info_pkl)
         self.focal_length_dict = {'diml_ganet': 1380.0 / 2.0, 'taskonomy': 512.0, 'online': 256.0,
                                   'apolloscape2': 2304.0 / 2.0, '3d-ken-burns': 512.0}
 
     def getData(self):
-        with open(self.dir_anno, 'r') as load_f:
-            all_annos = json.load(load_f)
+        data_path = os.path.join(cfg.ROOT_DIR, self.root)
+        depth_paths = []
+        rgb_paths = []
+        mask_paths = []
+        keypoints = []
+        cam_near_clips = []
+        cam_far_clips = []
+        joints_2d = np.load(os.path.join(data_path, 'info_frames.npz'))['joints_2d']
+        info_pkl = pickle.load(open(os.path.join(data_path, 'info_frames.pickle'), 'rb'))
+        info_npz = np.load(os.path.join(data_path, 'info_frames.npz'))
+        for idx in range(0, len(info_pkl)):
+            if os.path.exists(os.path.join(data_path, '{:05d}'.format(idx) + '.jpg')):
+                keypoint = joints_2d[idx]
+                rgb_path = os.path.join(data_path, '{:05d}'.format(idx) + '.jpg')
+                depth_path = os.path.join(data_path, '{:05d}'.format(idx) + '.png')
+                mask_path = os.path.join(data_path, '{:05d}'.format(idx) + '_id.png')
 
-        curriculum_list = list(np.random.choice(len(all_annos), len(all_annos), replace=False))
+                infot = info_pkl[idx]
+                cam_near_clip = infot['cam_near_clip']
+                if 'cam_far_clip' in infot.keys():
+                    cam_far_clip = infot['cam_far_clip']
+                else:
+                    cam_far_clip = 800.
 
-        rgb_paths = [
-            os.path.join(cfg.ROOT_DIR, self.root, all_annos[i]['rgb_path']) 
-            for i in range(len(all_annos))
-        ]
-        depth_paths = [
-            os.path.join(cfg.ROOT_DIR, self.root, all_annos[i]['depth_path'])
-            if 'depth_path' in all_annos[i]
-            else None
-            for i in range(len(all_annos))
-        ]
-        disp_paths = [
-            os.path.join(cfg.ROOT_DIR, self.root, all_annos[i]['disp_path'])
-            if 'disp_path' in all_annos[i]
-            else None
-            for i in range(len(all_annos))
-        ]
-        mask_paths = [
-            (
-                os.path.join(cfg.ROOT_DIR, self.root, all_annos[i]['mask_path'])
-                if all_annos[i]['mask_path'] is not None 
-                else None
-            )
-            if 'mask_path' in all_annos[i]
-            else None
-            for i in range(len(all_annos))
-        ]
-        ins_paths = [
-            (
-                os.path.join(cfg.ROOT_DIR, self.root, all_annos[i]['ins_planes_path'])
-                if all_annos[i]['ins_planes_path'] is not None 
-                else None
-            )
-            if 'ins_planes_path' in all_annos[i]
-            else None
-            for i in range(len(all_annos))
-        ]
+                keypoints.append(keypoint)
+                rgb_paths.append(rgb_path)
+                depth_paths.append(depth_path)
+                mask_paths.append(mask_path)
+                cam_near_clips.append(cam_near_clip)
+                cam_far_clips.append(cam_far_clip)
 
-        return rgb_paths, depth_paths, disp_paths, mask_paths, ins_paths, all_annos, curriculum_list
+        return rgb_paths, depth_paths, mask_paths, cam_near_clips, cam_far_clips, info_pkl, info_npz
 
     def __getitem__(self, anno_index):
         if 'train' in self.opt.phase:
@@ -88,17 +87,19 @@ class GTADataset(Dataset):
         :param anno_index: data index.
         """
         rgb_path = self.rgb_paths[anno_index]
-        depth_path = self.depth_paths[anno_index]
-
         rgb = cv2.imread(rgb_path)[:, :, ::-1]  # bgr, H*W*C
-        depth, sky_mask, mask_valid = self.load_depth(anno_index, rgb)
+        depth = read_depthmap(name=self.depth_paths[anno_index], cam_near_clip=self.cam_near_clips[anno_index],
+                              cam_far_clip=self.cam_far_clips[anno_index])
+        drange = depth.max()
+        depth_norm = depth / drange
+        mask_valid = (depth_norm > 1e-8).astype(np.float)
 
         rgb_resize = cv2.resize(rgb, (cfg.DATASET.CROP_SIZE[1], cfg.DATASET.CROP_SIZE[0]),
-                              interpolation=cv2.INTER_LINEAR)
+                                interpolation=cv2.INTER_LINEAR)
         # to torch, normalize
         rgb_torch = self.scale_torch(rgb_resize.copy())
         # normalize disp and depth
-        depth_normal = depth / (depth.max() + 1e-8)
+        depth_normal = depth_norm / (depth_norm.max() + 1e-8)
         depth_normal[~mask_valid.astype(np.bool)] = 0
 
         data = {'rgb': rgb_torch, 'gt_depth': depth_normal}
@@ -111,55 +112,42 @@ class GTADataset(Dataset):
         """
         rgb_path = self.rgb_paths[anno_index]
         depth_path = self.depth_paths[anno_index]
-        rgb = cv2.imread(rgb_path)[:, :, ::-1]   # rgb, H*W*C
-
+        rgb = cv2.imread(rgb_path)[:, :, ::-1]  # rgb, H*W*C
+        joints_2d = self.info_npz['joints_2d'][anno_index]
+        joints_3d_cam = self.info_npz['joints_3d_cam'][anno_index]
+        joints_3d_world = self.info_npz['joints_3d_world'][anno_index]
+        world2cam_trans = self.info_npz['world2cam_trans'][anno_index]
+        intrinsics = self.info_npz['intrinsics'][anno_index]
         focal_length = self.focal_length_dict[
             self.dataset_name.lower()] if self.dataset_name.lower() in self.focal_length_dict else 256.0
+        depth, disp, sem_mask, invalid_disp, invalid_depth = self.load_training_data(anno_index)
 
-        disp, depth, \
-        invalid_disp, invalid_depth, \
-        ins_planes_mask, sky_mask, \
-        ground_mask, depth_path = self.load_training_data(anno_index, rgb)
         rgb_aug = self.rgb_aug(rgb)
 
         # resize rgb, depth, disp
         flip_flg, resize_size, crop_size, pad, resize_ratio = self.set_flip_resize_crop_pad(rgb_aug)
 
         rgb_resize = self.flip_reshape_crop_pad(rgb_aug, flip_flg, resize_size, crop_size, pad, 0)
-        depth_resize = self.flip_reshape_crop_pad(depth, flip_flg, resize_size, crop_size, pad, -1, resize_method='nearest')
-        disp_resize = self.flip_reshape_crop_pad(disp, flip_flg, resize_size, crop_size, pad, -1, resize_method='nearest')
+        depth_resize = self.flip_reshape_crop_pad(depth, flip_flg, resize_size, crop_size, pad, -1,
+                                                  resize_method='nearest')
+        disp_resize = self.flip_reshape_crop_pad(disp, flip_flg, resize_size, crop_size, pad, -1,
+                                                 resize_method='nearest')
+        sem_mask_resize = self.flip_reshape_crop_pad(sem_mask.astype(np.uint8), flip_flg, resize_size, crop_size, pad,
+                                                     0, resize_method='nearest')
 
         # resize sky_mask, and invalid_regions
-        sky_mask_resize = self.flip_reshape_crop_pad(sky_mask.astype(np.uint8),
-                                                     flip_flg,
-                                                     resize_size,
-                                                     crop_size,
-                                                     pad,
-                                                     0,
-                                                     resize_method='nearest')
-        invalid_disp_resize = self.flip_reshape_crop_pad(invalid_disp.astype(np.uint8),
-                                                         flip_flg,
-                                                         resize_size,
-                                                         crop_size,
-                                                         pad,
-                                                         0,
-                                                         resize_method='nearest')
-        invalid_depth_resize = self.flip_reshape_crop_pad(invalid_depth.astype(np.uint8),
-                                                          flip_flg,
-                                                          resize_size,
-                                                          crop_size,
-                                                          pad,
-                                                          0,
-                                                          resize_method='nearest')
-        # resize ins planes
-        ins_planes_mask[ground_mask] = int(np.unique(ins_planes_mask).max() + 1)
-        ins_planes_mask_resize = self.flip_reshape_crop_pad(ins_planes_mask.astype(np.uint8),
-                                                            flip_flg,
-                                                            resize_size,
-                                                            crop_size,
-                                                            pad,
-                                                            0,
-                                                            resize_method='nearest')
+        invalid_disp_resize = self.flip_reshape_crop_pad(invalid_disp.astype(np.uint8), flip_flg, resize_size,
+                                                         crop_size, pad, 0, resize_method='nearest')
+        invalid_depth_resize = self.flip_reshape_crop_pad(invalid_depth.astype(np.uint8), flip_flg, resize_size,
+                                                          crop_size, pad, 0, resize_method='nearest')
+        # # resize ins planes
+        road_mask = sem_mask == -1
+        ins_planes_mask = sem_mask == -1
+        ins_planes_mask[road_mask] = int(np.unique(ins_planes_mask).max() + 1)
+        ins_planes_mask_resize = self.flip_reshape_crop_pad(ins_planes_mask.astype(np.uint8), flip_flg, resize_size,
+                                                            crop_size, pad, 0, resize_method='nearest')
+        sky_mask_resize = sem_mask_resize == -1
+        human_mask_resize = sem_mask_resize == 126
 
         # normalize disp and depth
         depth_resize = depth_resize / (depth_resize.max() + 1e-8) * 10
@@ -176,18 +164,16 @@ class GTADataset(Dataset):
         depth_torch = self.scale_torch(depth_resize)
         disp_torch = self.scale_torch(disp_resize)
         ins_planes = torch.from_numpy(ins_planes_mask_resize)
-        focal_length = torch.tensor(focal_length)
 
-        if ('taskonomy' in self.dataset_name.lower()) or ('3d-ken-burns' in self.dataset_name.lower()):
-            quality_flg = np.array(3)
-        elif ('diml' in self.dataset_name.lower()):
-            quality_flg = np.array(2)
-        else:
-            quality_flg = np.array(1)
+        # TODO: add transforms for joints and camera_trans
 
-        data = {'rgb': rgb_torch, 'depth': depth_torch, 'disp': disp_torch,
-                'A_paths': rgb_path, 'B_paths': depth_path, 'quality_flg': quality_flg,
-                'planes': ins_planes, 'focal_length': focal_length}
+        data = {
+            'rgb': rgb_torch, 'depth': depth_torch, 'disp': disp_torch, 'sem_mask': torch.tensor(sem_mask_resize),
+            'human_mask': torch.tensor(human_mask_resize), 'joints_2d': torch.tensor(joints_2d),
+            'joints_3d_cam': torch.tensor(joints_3d_cam), 'joints_3d_world': torch.tensor(joints_3d_world),
+            'world2cam_trans': torch.tensor(world2cam_trans), 'intrinsics': torch.tensor(intrinsics),
+            'focal_length': torch.tensor(focal_length), 'A_paths': rgb_path, 'B_paths': depth_path,
+        }
         return data
 
     def rgb_aug(self, rgb):
@@ -226,11 +212,14 @@ class GTADataset(Dataset):
         resize_size = [int(A.shape[0] * resize_ratio + 0.5),
                        int(A.shape[1] * resize_ratio + 0.5)]  # [height, width]
         # crop
-        start_y = 0 if resize_size[0] <= cfg.DATASET.CROP_SIZE[0] else np.random.randint(0, resize_size[0] - cfg.DATASET.CROP_SIZE[0])
-        start_x = 0 if resize_size[1] <= cfg.DATASET.CROP_SIZE[1] else np.random.randint(0, resize_size[1] - cfg.DATASET.CROP_SIZE[1])
+        start_y = 0 if resize_size[0] <= cfg.DATASET.CROP_SIZE[0] else np.random.randint(0, resize_size[0] -
+                                                                                         cfg.DATASET.CROP_SIZE[0])
+        start_x = 0 if resize_size[1] <= cfg.DATASET.CROP_SIZE[1] else np.random.randint(0, resize_size[1] -
+                                                                                         cfg.DATASET.CROP_SIZE[1])
         crop_height = resize_size[0] if resize_size[0] <= cfg.DATASET.CROP_SIZE[0] else cfg.DATASET.CROP_SIZE[0]
         crop_width = resize_size[1] if resize_size[1] <= cfg.DATASET.CROP_SIZE[1] else cfg.DATASET.CROP_SIZE[1]
-        crop_size = [start_x, start_y, crop_width, crop_height] if 'train' in self.opt.phase else [0, 0, resize_size[1], resize_size[0]]
+        crop_size = [start_x, start_y, crop_width, crop_height] if 'train' in self.opt.phase else [0, 0, resize_size[1],
+                                                                                                   resize_size[0]]
 
         # pad
         pad_height = 0 if resize_size[0] > cfg.DATASET.CROP_SIZE[0] else cfg.DATASET.CROP_SIZE[0] - resize_size[0]
@@ -300,94 +289,30 @@ class GTADataset(Dataset):
             img = img[np.newaxis, :, :]
         if img.shape[2] == 3:
             transform = transforms.Compose([transforms.ToTensor(),
-                                            transforms.Normalize(cfg.DATASET.RGB_PIXEL_MEANS, cfg.DATASET.RGB_PIXEL_VARS)])
+                                            transforms.Normalize(cfg.DATASET.RGB_PIXEL_MEANS,
+                                                                 cfg.DATASET.RGB_PIXEL_VARS)])
             img = transform(img)
         else:
             img = img.astype(np.float32)
             img = torch.from_numpy(img)
         return img
 
-    def load_depth(self, anno_index, rgb):
-        """
-        Load disparity, depth, and mask maps
-        :return
-            disp: disparity map,  np.float
-            depth: depth map, np.float
-            sem_mask: semantic masks, including sky, road, np.uint8
-            ins_mask: plane instance masks, np.uint8
-        """
-        # load depth
-        depth = cv2.imread(self.depth_paths[anno_index], -1)
-        depth, mask_valid = self.preprocess_depth(depth, self.depth_paths[anno_index])
 
+    def load_training_data(self, anno_index):
+        depth = read_depthmap(name=self.depth_paths[anno_index], cam_near_clip=self.cam_near_clips[anno_index],
+                              cam_far_clip=self.cam_far_clips[anno_index])
+        depth = (depth / depth.max() * 60000).astype(np.uint16)
+        depth_mask = depth < 1e-8
+        disp = 1 / (depth + 1e-8)
+        disp[depth_mask] = 0
+        disp = (disp / disp.max() * 60000).astype(np.uint16)
         # load semantic mask, such as road, sky
-        if len(self.rgb_paths) == len(self.sem_masks) and self.sem_masks[anno_index] is not None:
-            sem_mask = cv2.imread(self.sem_masks[anno_index], -1).astype(np.uint8)
-        else:
-            sem_mask = np.zeros(depth.shape, dtype=np.uint8)
-        sky_mask = sem_mask == 17
-
-        return depth, sky_mask, mask_valid
-
-    def load_training_data(self, anno_index, rgb):
-        """
-        Load disparity, depth, and mask maps
-        :return
-            disp: disparity map,  np.float
-            depth: depth map, np.float
-            sem_mask: semantic masks, including sky, road, np.uint8
-            ins_mask: plane instance masks, np.uint8
-        """
-        # load depth, rgb, disp
-        if (self.depth_paths[anno_index] != None) and (self.disp_paths[anno_index] != None):
-            # dataset has both depth and disp
-            disp = cv2.imread(self.disp_paths[anno_index], -1)
-            disp = (disp / disp.max() * 60000).astype(np.uint16)
-            depth = cv2.imread(self.depth_paths[anno_index], -1)
-            depth = (depth / depth.max() * 60000).astype(np.uint16)
-            depth_path = self.depth_paths[anno_index]
-        elif self.disp_paths[anno_index] != None:
-            # dataset only has disparity
-            disp = cv2.imread(self.disp_paths[anno_index], -1)
-            disp_mask = disp < 1e-8
-            depth = 1 / (disp + 1e-8)
-            depth[disp_mask] = 0
-            depth = (depth / depth.max() * 60000).astype(np.uint16)
-            depth_path = self.disp_paths[anno_index]
-        elif self.depth_paths[anno_index] != None:
-            # dataset only has depth
-            depth_path = self.depth_paths[anno_index]
-            depth = cv2.imread(self.depth_paths[anno_index], -1)
-            depth = (self.loading_check(depth, depth_path)).astype(np.uint16)
-            depth_mask = depth < 1e-8
-            disp = 1 / (depth + 1e-8)
-            disp[depth_mask] = 0
-            disp = (disp / disp.max() * 60000).astype(np.uint16)
-        else:
-            depth = np.full((rgb.shape[0], rgb.shape[1]), 0, dtype=np.uint16)
-            disp = np.full((rgb.shape[0], rgb.shape[1]), 0, dtype=np.uint16)
-            depth_path = 'None'
-
-        # load semantic mask, such as road, sky
-        if len(self.rgb_paths) == len(self.sem_masks) and self.sem_masks[anno_index] is not None:
-            sem_mask = cv2.imread(self.sem_masks[anno_index], -1).astype(np.uint8)
-        else:
-            sem_mask = np.zeros(disp.shape, dtype=np.uint8)
-
-        # load planes mask
-        if len(self.rgb_paths) == len(self.ins_paths) and self.ins_paths[anno_index] is not None:
-            ins_planes_mask = cv2.imread(self.ins_paths[anno_index], -1).astype(np.uint8)
-        else:
-            ins_planes_mask = np.zeros(disp.shape, dtype=np.uint8)
-
-        sky_mask = sem_mask == 17
-        road_mask = sem_mask == 49
+        sem_mask = cv2.imread(self.sem_masks[anno_index], cv2.IMREAD_ANYDEPTH).astype(np.uint8)
 
         invalid_disp = disp < 1e-8
         invalid_depth = depth < 1e-8
-        return disp, depth, invalid_disp, invalid_depth, ins_planes_mask, sky_mask, road_mask, depth_path
 
-        #return disp, depth, sem_mask, depth_path, ins_planes_mask
+        return depth, disp, sem_mask, invalid_disp, invalid_depth
 
     def preprocess_depth(self, depth, img_path):
         if 'diml' in img_path.lower():
@@ -396,8 +321,8 @@ class GTADataset(Dataset):
             depth[depth > 23000] = 0
             drange = 23000.0
         else:
-            #depth_filter1 = depth[depth > 1e-8]
-            #drange = (depth_filter1.max() - depth_filter1.min())
+            # depth_filter1 = depth[depth > 1e-8]
+            # drange = (depth_filter1.max() - depth_filter1.min())
             drange = depth.max()
         depth_norm = depth / drange
         mask_valid = (depth_norm > 1e-8).astype(np.float)
@@ -417,4 +342,3 @@ class GTADataset(Dataset):
 
     # def name(self):
     #     return 'DiverseDepth'
-

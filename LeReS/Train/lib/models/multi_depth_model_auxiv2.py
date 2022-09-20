@@ -132,6 +132,7 @@ class ModelLoss(nn.Module):
             pred_ssinv = None
 
         # Geometry Loss
+        # L-PWN
         if '_pairwise-normal-regress-plane_' in cfg.TRAIN.LOSS_MODE.lower():
             focal_length = data['focal_length'] if 'focal_length' in data else None
             loss['pairwise-normal-regress-plane_loss'] = self.pn_plane(gt_depth,
@@ -149,7 +150,7 @@ class ModelLoss(nn.Module):
 
         # Scale-shift Invariant Loss
         if '_meanstd-tanh_' in cfg.TRAIN.LOSS_MODE.lower():
-            loss_ssi = self.meanstd_tanh_loss(pred_depth_mid, gt_depth_mid)
+            loss_ssi = self.meanstd_tanh_loss(pred_depth_mid, gt_depth_mid)# L-ILNR
             loss['meanstd-tanh_loss'] = loss_ssi
 
         if '_ranking-edge_' in cfg.TRAIN.LOSS_MODE.lower():
@@ -157,7 +158,7 @@ class ModelLoss(nn.Module):
 
         # Multi-scale Gradient Loss
         if '_msgil-normal_' in cfg.TRAIN.LOSS_MODE.lower():
-            loss['msg_normal_loss'] = (self.msg_normal_loss(pred_depth_mid, gt_depth_mid) * 0.5).float()
+            loss['msg_normal_loss'] = (self.msg_normal_loss(pred_depth_mid, gt_depth_mid) * 0.5).float() # L-MSG
 
         total_loss = sum(loss.values())
         loss['total_loss'] = total_loss
