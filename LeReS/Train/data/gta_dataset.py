@@ -13,21 +13,6 @@ from imgaug import augmenters as iaa
 from lib.configs.config import cfg
 
 
-def read_depthmap(name, cam_near_clip, cam_far_clip):
-    depth = cv2.imread(name)
-    depth = np.concatenate(
-        (depth, np.zeros_like(depth[:, :, 0:1], dtype=np.uint8)), axis=2
-    )
-    depth.dtype = np.uint32
-    depth = 0.05 * 1000 / depth.astype('float')
-    depth = (
-            cam_near_clip
-            * cam_far_clip
-            / (cam_near_clip + depth * (cam_far_clip - cam_near_clip))
-    )
-    return depth
-
-
 class GTADataset(Dataset):
     def __init__(self, opt, dataset_name=None):
         super(GTADataset, self).__init__()
@@ -36,8 +21,6 @@ class GTADataset(Dataset):
         self.dataset_name = dataset_name
         self.rgb_paths, self.depth_paths, self.mask_paths, self.cam_near_clips, self.cam_far_clips, self.info_pkl, self.info_npz = self.getData()
         self.data_size = len(self.info_pkl)
-        self.focal_length_dict = {'diml_ganet': 1380.0 / 2.0, 'taskonomy': 512.0, 'online': 256.0,
-                                  'apolloscape2': 2304.0 / 2.0, '3d-ken-burns': 512.0}
 
     def getData(self):
         data_path = os.path.join(cfg.ROOT_DIR, self.root)
@@ -80,6 +63,20 @@ class GTADataset(Dataset):
             data = self.load_test_data(anno_index)
         return data
 
+    def read_depthmap(self, name, cam_near_clip, cam_far_clip):
+        depth = cv2.imread(name)
+        depth = np.concatenate(
+            (depth, np.zeros_like(depth[:, :, 0:1], dtype=np.uint8)), axis=2
+        )
+        depth.dtype = np.uint32
+        depth = 0.05 * 1000 / depth.astype('float')
+        depth = (
+                cam_near_clip
+                * cam_far_clip
+                / (cam_near_clip + depth * (cam_far_clip - cam_near_clip))
+        )
+        return depth
+
     def load_test_data(self, anno_index):
         """
         Augment data for training online randomly. The invalid parts in the depth map are set to -1.0, while the parts
@@ -88,8 +85,8 @@ class GTADataset(Dataset):
         """
         rgb_path = self.rgb_paths[anno_index]
         rgb = cv2.imread(rgb_path)[:, :, ::-1]  # bgr, H*W*C
-        depth = read_depthmap(name=self.depth_paths[anno_index], cam_near_clip=self.cam_near_clips[anno_index],
-                              cam_far_clip=self.cam_far_clips[anno_index])
+        depth = self.read_depthmap(name=self.depth_paths[anno_index], cam_near_clip=self.cam_near_clips[anno_index],
+                                   cam_far_clip=self.cam_far_clips[anno_index])
         drange = depth.max()
         depth_norm = depth / drange
         mask_valid = (depth_norm > 1e-8).astype(np.float)
@@ -118,9 +115,8 @@ class GTADataset(Dataset):
         joints_3d_world = self.info_npz['joints_3d_world'][anno_index]
         world2cam_trans = self.info_npz['world2cam_trans'][anno_index]
         intrinsics = self.info_npz['intrinsics'][anno_index]
-        focal_length = self.focal_length_dict[
-            self.dataset_name.lower()] if self.dataset_name.lower() in self.focal_length_dict else 256.0
-        depth, disp, sem_mask, invalid_disp, invalid_depth = self.load_training_data(anno_index)
+        focal_length = intrinsics[0][0]
+        depth, invalid_depth, sem_mask = self.load_training_data(anno_index)
 
         rgb_aug = self.rgb_aug(rgb)
 
@@ -130,14 +126,10 @@ class GTADataset(Dataset):
         rgb_resize = self.flip_reshape_crop_pad(rgb_aug, flip_flg, resize_size, crop_size, pad, 0)
         depth_resize = self.flip_reshape_crop_pad(depth, flip_flg, resize_size, crop_size, pad, -1,
                                                   resize_method='nearest')
-        disp_resize = self.flip_reshape_crop_pad(disp, flip_flg, resize_size, crop_size, pad, -1,
-                                                 resize_method='nearest')
         sem_mask_resize = self.flip_reshape_crop_pad(sem_mask.astype(np.uint8), flip_flg, resize_size, crop_size, pad,
                                                      0, resize_method='nearest')
 
         # resize sky_mask, and invalid_regions
-        invalid_disp_resize = self.flip_reshape_crop_pad(invalid_disp.astype(np.uint8), flip_flg, resize_size,
-                                                         crop_size, pad, 0, resize_method='nearest')
         invalid_depth_resize = self.flip_reshape_crop_pad(invalid_depth.astype(np.uint8), flip_flg, resize_size,
                                                           crop_size, pad, 0, resize_method='nearest')
         # # resize ins planes
@@ -151,24 +143,20 @@ class GTADataset(Dataset):
 
         # normalize disp and depth
         depth_resize = depth_resize / (depth_resize.max() + 1e-8) * 10
-        disp_resize = disp_resize / (disp_resize.max() + 1e-8) * 10
 
         # invalid regions are set to -1, sky regions are set to 0 in disp and 10 in depth
-        disp_resize[invalid_disp_resize.astype(np.bool) | (disp_resize > 1e7) | (disp_resize < 0)] = -1
         depth_resize[invalid_depth_resize.astype(np.bool) | (depth_resize > 1e7) | (depth_resize < 0)] = -1
-        disp_resize[sky_mask_resize.astype(np.bool)] = 0  # 0
         depth_resize[sky_mask_resize.astype(np.bool)] = 20
 
         # to torch, normalize
         rgb_torch = self.scale_torch(rgb_resize.copy())
         depth_torch = self.scale_torch(depth_resize)
-        disp_torch = self.scale_torch(disp_resize)
         ins_planes = torch.from_numpy(ins_planes_mask_resize)
 
         # TODO: add transforms for joints and camera_trans
 
         data = {
-            'rgb': rgb_torch, 'depth': depth_torch, 'disp': disp_torch, 'sem_mask': torch.tensor(sem_mask_resize),
+            'rgb': rgb_torch, 'depth': depth_torch, 'sem_mask': torch.tensor(sem_mask_resize),
             'human_mask': torch.tensor(human_mask_resize), 'joints_2d': torch.tensor(joints_2d),
             'joints_3d_cam': torch.tensor(joints_3d_cam), 'joints_3d_world': torch.tensor(joints_3d_world),
             'world2cam_trans': torch.tensor(world2cam_trans), 'intrinsics': torch.tensor(intrinsics),
@@ -297,36 +285,14 @@ class GTADataset(Dataset):
             img = torch.from_numpy(img)
         return img
 
-
     def load_training_data(self, anno_index):
-        depth = read_depthmap(name=self.depth_paths[anno_index], cam_near_clip=self.cam_near_clips[anno_index],
-                              cam_far_clip=self.cam_far_clips[anno_index])
-        depth = (depth / depth.max() * 60000).astype(np.uint16)
-        depth_mask = depth < 1e-8
-        disp = 1 / (depth + 1e-8)
-        disp[depth_mask] = 0
-        disp = (disp / disp.max() * 60000).astype(np.uint16)
+        depth = self.read_depthmap(name=self.depth_paths[anno_index], cam_near_clip=self.cam_near_clips[anno_index],
+                                   cam_far_clip=self.cam_far_clips[anno_index]).astype(np.uint16)
         # load semantic mask, such as road, sky
         sem_mask = cv2.imread(self.sem_masks[anno_index], cv2.IMREAD_ANYDEPTH).astype(np.uint8)
-
-        invalid_disp = disp < 1e-8
         invalid_depth = depth < 1e-8
 
-        return depth, disp, sem_mask, invalid_disp, invalid_depth
-
-    def preprocess_depth(self, depth, img_path):
-        if 'diml' in img_path.lower():
-            drange = 65535.0
-        elif 'taskonomy' in img_path.lower():
-            depth[depth > 23000] = 0
-            drange = 23000.0
-        else:
-            # depth_filter1 = depth[depth > 1e-8]
-            # drange = (depth_filter1.max() - depth_filter1.min())
-            drange = depth.max()
-        depth_norm = depth / drange
-        mask_valid = (depth_norm > 1e-8).astype(np.float)
-        return depth_norm, mask_valid
+        return depth, invalid_depth, sem_mask
 
     def loading_check(self, depth, depth_path):
         if 'taskonomy' in depth_path:
