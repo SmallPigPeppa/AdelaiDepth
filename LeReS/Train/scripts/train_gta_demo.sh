@@ -3,9 +3,9 @@ export CUDA_VISIBLE_DEVICES=0
 
 python ../tools/train.py \
 --dataset gta \
---dataroot /share/wenzhuoliu/torch_ds/GTA-IM \
+--dataroot /share/wenzhuoliu/torch_ds/GTA-IM/FPS-5 \
 --backbone resnet50 \
---dataset_list demo \
+--dataset_list 2020-06-09-17-14-03 \
 --batchsize 2 \
 --base_lr 0.001 \
 --use_tfboard \
