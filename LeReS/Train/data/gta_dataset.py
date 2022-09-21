@@ -293,7 +293,7 @@ class GTADataset(Dataset):
         depth = self.read_depthmap(name=self.depth_paths[anno_index], cam_near_clip=self.cam_near_clips[anno_index],
                                    cam_far_clip=self.cam_far_clips[anno_index]).astype(np.uint16)
         # load semantic mask, such as road, sky
-        sem_mask = cv2.imread(self.sem_masks[anno_index], cv2.IMREAD_ANYDEPTH).astype(np.uint8)
+        sem_mask = cv2.imread(self.mask_paths[anno_index], cv2.IMREAD_ANYDEPTH).astype(np.uint8)
         invalid_depth = depth < 1e-8
 
         return depth, invalid_depth, sem_mask
