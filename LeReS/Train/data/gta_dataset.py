@@ -116,7 +116,8 @@ class GTADataset(Dataset):
         joints_2d = self.info_npz['joints_2d'][anno_index]
         joints_3d_cam = self.info_npz['joints_3d_cam'][anno_index]
         joints_3d_world = self.info_npz['joints_3d_world'][anno_index]
-        world2cam_trans = self.info_npz['world2cam_trans'][anno_index]
+        # world2cam_trans = self.info_npz['world2cam_trans'][anno_index]
+        world2cam_trans = None
         intrinsics = self.info_npz['intrinsics'][anno_index]
         focal_length = intrinsics[0][0]
         depth, invalid_depth, sem_mask = self.load_training_data(anno_index)
