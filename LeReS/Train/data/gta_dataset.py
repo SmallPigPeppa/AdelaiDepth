@@ -152,7 +152,7 @@ class GTADataset(Dataset):
         human_mask_resize = sem_mask_resize == 126
 
         # normalize disp and depth
-        depth_resize = depth_resize / (depth_resize.max() + 1e-8) * 10
+        depth_resize = (depth_resize / depth_resize.max() + 1e-8) * 10
 
         # invalid regions are set to -1, sky regions are set to 0 in disp and 10 in depth
         depth_resize[invalid_depth_resize.astype(np.bool) | (depth_resize > 1e7) | (depth_resize < 0)] = -1
