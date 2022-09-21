@@ -89,12 +89,12 @@ class ModelLoss(nn.Module):
 
         # Geometry Loss
         # L-PWN
-        if '_pairwise-normal-regress-plane_' in cfg.TRAIN.LOSS_MODE.lower():
-            focal_length = data['focal_length'] if 'focal_length' in data else None
-            loss['pairwise-normal-regress-plane_loss'] = self.pn_plane(gt_depth,
-                                                                       pred_ssinv,
-                                                                       data['planes'],
-                                                                       focal_length)
+        # if '_pairwise-normal-regress-plane_' in cfg.TRAIN.LOSS_MODE.lower():
+        #     focal_length = data['focal_length'] if 'focal_length' in data else None
+        #     loss['pairwise-normal-regress-plane_loss'] = self.pn_plane(gt_depth,
+        #                                                                pred_ssinv,
+        #                                                                data['planes'],
+        #                                                                focal_length)
         if '_pairwise-normal-regress-edge_' in cfg.TRAIN.LOSS_MODE.lower():
             loss['pairwise-normal-regress-edge_loss'] = self.pn_edge(pred_ssinv,
                                                                      gt_depth,
