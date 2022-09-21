@@ -1,5 +1,5 @@
 export PYTHONPATH=../../Train:${PYTHONPATH}
-export CUDA_VISIBLE_DEVICES=0,1
+export CUDA_VISIBLE_DEVICES=0
 
 python ../tools/train.py \
 --dataset gta \
