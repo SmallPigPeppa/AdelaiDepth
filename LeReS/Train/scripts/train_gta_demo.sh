@@ -14,5 +14,5 @@ python ../tools/train.py \
 --epoch 2 \
 --lr_scheduler_multiepochs 1 \
 --val_step 10000 \
---snapshot_iters 50 \
+--snapshot_iters 100000 \
 --log_interval 5 
