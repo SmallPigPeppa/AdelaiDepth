@@ -20,6 +20,7 @@ class GTADataset(Dataset):
         self.root = opt.dataroot
         self.dataset_name = dataset_name
         self.rgb_paths, self.depth_paths, self.mask_paths, self.cam_near_clips, self.cam_far_clips, self.info_pkl, self.info_npz = self.getData()
+        print(self.info_npz)
         self.data_size = len(self.info_pkl)
         self.curriculum_list = list(np.random.choice(self.data_size, self.data_size, replace=False))
         print("data_size",self.data_size)
@@ -116,8 +117,7 @@ class GTADataset(Dataset):
         joints_2d = self.info_npz['joints_2d'][anno_index]
         joints_3d_cam = self.info_npz['joints_3d_cam'][anno_index]
         joints_3d_world = self.info_npz['joints_3d_world'][anno_index]
-        # world2cam_trans = self.info_npz['world2cam_trans'][anno_index]
-        world2cam_trans = None
+        world2cam_trans = self.info_npz['world2cam_trans'][anno_index]
         intrinsics = self.info_npz['intrinsics'][anno_index]
         focal_length = intrinsics[0][0]
         depth, invalid_depth, sem_mask = self.load_training_data(anno_index)
