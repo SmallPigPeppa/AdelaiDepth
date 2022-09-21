@@ -108,6 +108,7 @@ class GTADataset(Dataset):
         Augment data for training online randomly.
         :param anno_index: data index.
         """
+        print(anno_index)
         rgb_path = self.rgb_paths[anno_index]
         depth_path = self.depth_paths[anno_index]
         rgb = cv2.imread(rgb_path)[:, :, ::-1]  # rgb, H*W*C
