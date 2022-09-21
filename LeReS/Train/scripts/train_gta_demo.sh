@@ -5,7 +5,7 @@ python ../tools/train.py \
 --dataset gta \
 --dataroot /share/wenzhuoliu/torch_ds/GTA-IM/FPS-5 \
 --backbone resnet50 \
---dataset_list 2020-06-09-17-14-03 \
+--dataset_list 2020-06-11-10-06-48 \
 --batchsize 2 \
 --base_lr 0.001 \
 --use_tfboard \
