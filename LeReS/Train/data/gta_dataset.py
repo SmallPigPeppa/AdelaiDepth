@@ -23,7 +23,7 @@ class GTADataset(Dataset):
         self.data_size = len(self.info_pkl)
 
     def getData(self):
-        data_path = os.path.join(cfg.ROOT_DIR, self.root)
+        data_path = os.path.join(self.root,self.dataset_name)
         depth_paths = []
         rgb_paths = []
         mask_paths = []
