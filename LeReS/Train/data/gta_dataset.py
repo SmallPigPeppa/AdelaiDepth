@@ -156,7 +156,8 @@ class GTADataset(Dataset):
         depth_resize = depth_resize + 1e-8
 
         # invalid regions are set to -1, sky regions are set to 0 in disp and 10 in depth
-        depth_resize[invalid_depth_resize.astype(np.bool) | (depth_resize > 1e7) | (depth_resize < 0)] = -1
+        # depth_resize[invalid_depth_resize.astype(np.bool) | (depth_resize > 1e7) | (depth_resize < 0)] = -1
+        depth_resize[invalid_depth_resize.astype(np.bool) | (depth_resize > 1e7) | (depth_resize < 0)] = 1e-8
         depth_resize[sky_mask_resize.astype(np.bool)] = 20
 
         # to torch, normalize
