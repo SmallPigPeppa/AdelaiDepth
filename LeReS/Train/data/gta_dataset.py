@@ -23,10 +23,10 @@ class GTADataset(Dataset):
         print(self.info_npz)
         self.data_size = len(self.info_pkl)
         self.curriculum_list = list(np.random.choice(self.data_size, self.data_size, replace=False))
-        print("data_size",self.data_size)
+        print("data_size", self.data_size)
 
     def getData(self):
-        data_path = os.path.join(self.root,self.dataset_name)
+        data_path = os.path.join(self.root, self.dataset_name)
         depth_paths = []
         rgb_paths = []
         mask_paths = []
@@ -78,7 +78,7 @@ class GTADataset(Dataset):
                 * cam_far_clip
                 / (cam_near_clip + depth * (cam_far_clip - cam_near_clip))
         )
-        return depth
+        return np.squeeze(depth)
 
     def load_test_data(self, anno_index):
         """
@@ -294,6 +294,7 @@ class GTADataset(Dataset):
                                    cam_far_clip=self.cam_far_clips[anno_index]).astype(np.uint16)
         # load semantic mask, such as road, sky
         sem_mask = cv2.imread(self.mask_paths[anno_index], cv2.IMREAD_ANYDEPTH).astype(np.uint8)
+        sem_mask = np.squeeze(sem_mask)
         invalid_depth = depth < 1e-8
 
         return depth, invalid_depth, sem_mask
