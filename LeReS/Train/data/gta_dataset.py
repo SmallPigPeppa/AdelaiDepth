@@ -20,7 +20,7 @@ class GTADataset(Dataset):
         self.root = opt.dataroot
         self.dataset_name = dataset_name
         self.rgb_paths, self.depth_paths, self.mask_paths, self.cam_near_clips, self.cam_far_clips, self.info_pkl, self.info_npz = self.getData()
-        print(self.info_npz)
+        print(self.info_npz.files)
         self.data_size = len(self.info_pkl)
         self.curriculum_list = list(np.random.choice(self.data_size, self.data_size, replace=False))
         # print("data_size", self.data_size)
