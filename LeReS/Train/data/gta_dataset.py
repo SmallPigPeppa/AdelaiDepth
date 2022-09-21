@@ -27,7 +27,7 @@ class GTADataset(Dataset):
 
     def getData(self):
         data_path = os.path.join(self.root, self.dataset_name)
-        self.data_path=data_path
+        self.data_path = data_path
         depth_paths = []
         rgb_paths = []
         mask_paths = []
@@ -116,7 +116,7 @@ class GTADataset(Dataset):
         depth_path = self.depth_paths[anno_index]
         rgb = cv2.imread(rgb_path)[:, :, ::-1]  # rgb, H*W*C
         joints_2d = np.load(os.path.join(self.data_path, 'info_frames.npz'))['joints_2d'][0]
-        joints_3d_cam =np.load(os.path.join(self.data_path, 'info_frames.npz'))['joints_3d_cam'][0]
+        joints_3d_cam = np.load(os.path.join(self.data_path, 'info_frames.npz'))['joints_3d_cam'][0]
         joints_3d_world = np.load(os.path.join(self.data_path, 'info_frames.npz'))['joints_3d_world'][0]
         world2cam_trans = np.load(os.path.join(self.data_path, 'info_frames.npz'))['world2cam_trans'][0]
         intrinsics = np.load(os.path.join(self.data_path, 'info_frames.npz'))['intrinsics'][0]
@@ -152,7 +152,8 @@ class GTADataset(Dataset):
         human_mask_resize = sem_mask_resize == 126
 
         # normalize disp and depth
-        depth_resize = (depth_resize / depth_resize.max() + 1e-8) * 10
+        depth_resize = (depth_resize / (depth_resize.max() + 1e-8)) * 10
+        depth_resize = depth_resize + 1e-8
 
         # invalid regions are set to -1, sky regions are set to 0 in disp and 10 in depth
         depth_resize[invalid_depth_resize.astype(np.bool) | (depth_resize > 1e7) | (depth_resize < 0)] = -1
