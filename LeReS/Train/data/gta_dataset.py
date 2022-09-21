@@ -20,10 +20,10 @@ class GTADataset(Dataset):
         self.root = opt.dataroot
         self.dataset_name = dataset_name
         self.rgb_paths, self.depth_paths, self.mask_paths, self.cam_near_clips, self.cam_far_clips, self.info_pkl, self.info_npz = self.getData()
-        print(self.info_npz)
+        # print(self.info_npz)
         self.data_size = len(self.info_pkl)
         self.curriculum_list = list(np.random.choice(self.data_size, self.data_size, replace=False))
-        print("data_size", self.data_size)
+        # print("data_size", self.data_size)
 
     def getData(self):
         data_path = os.path.join(self.root, self.dataset_name)
@@ -110,7 +110,7 @@ class GTADataset(Dataset):
         Augment data for training online randomly.
         :param anno_index: data index.
         """
-        print(anno_index)
+        # print(anno_index)
         rgb_path = self.rgb_paths[anno_index]
         depth_path = self.depth_paths[anno_index]
         rgb = cv2.imread(rgb_path)[:, :, ::-1]  # rgb, H*W*C
