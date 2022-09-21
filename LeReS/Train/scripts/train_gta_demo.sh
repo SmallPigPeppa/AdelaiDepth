@@ -15,4 +15,4 @@ python ../tools/train.py \
 --lr_scheduler_multiepochs 1 \
 --val_step 10000 \
 --snapshot_iters 100000 \
---log_interval 5 
+--log_interval 1
