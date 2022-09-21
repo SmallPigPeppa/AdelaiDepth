@@ -134,7 +134,9 @@ class GTADataset(Dataset):
         flip_flg, resize_size, crop_size, pad, resize_ratio = self.set_flip_resize_crop_pad(rgb_aug)
 
         rgb_resize = self.flip_reshape_crop_pad(rgb_aug, flip_flg, resize_size, crop_size, pad, 0)
-        depth_resize = self.flip_reshape_crop_pad(depth, flip_flg, resize_size, crop_size, pad, 0,
+        # depth_resize = self.flip_reshape_crop_pad(depth, flip_flg, resize_size, crop_size, pad, 0,
+        #                                           resize_method='nearest')
+        depth_resize = self.flip_reshape_crop_pad(depth, flip_flg, resize_size, crop_size, pad, -1,
                                                   resize_method='nearest')
         sem_mask_resize = self.flip_reshape_crop_pad(sem_mask.astype(np.uint8), flip_flg, resize_size, crop_size, pad,
                                                      0, resize_method='nearest')
@@ -152,6 +154,7 @@ class GTADataset(Dataset):
         human_mask_resize = sem_mask_resize == 126
 
         # normalize disp and depth
+        print(depth_resize.max())
         depth_resize = (depth_resize / (depth_resize.max() + 1e-8)) * 10
         depth_resize = depth_resize + 1e-8
 
