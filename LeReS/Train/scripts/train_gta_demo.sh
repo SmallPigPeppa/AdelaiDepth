@@ -3,7 +3,7 @@ export CUDA_VISIBLE_DEVICES=0,1
 
 python ../tools/train.py \
 --dataset gta \
---dataroot /share/torch_ds/GTA-IM \
+--dataroot /share/wenzhuoliu/torch_ds/GTA-IM \
 --backbone resnet50 \
 --dataset_list demo \
 --batchsize 2 \
