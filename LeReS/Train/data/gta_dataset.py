@@ -34,9 +34,8 @@ class GTADataset(Dataset):
         # keypoints = []
         cam_near_clips = []
         cam_far_clips = []
-        self.joints_2d = np.load(os.path.join(data_path, 'info_frames.npz'))['joints_2d']
         self.info_pkl = pickle.load(open(os.path.join(data_path, 'info_frames.pickle'), 'rb'))
-        self.info_npz = np.load(os.path.join(data_path, 'info_frames.npz'))
+        self.info_npz = np.load(os.path.join(data_path, 'info_frames.npz'),allow_pickle=True)
         # joints_2d = np.load(os.path.join(data_path, 'info_frames.npz'))['joints_2d']
         info_pkl = pickle.load(open(os.path.join(data_path, 'info_frames.pickle'), 'rb'))
         info_npz = np.load(os.path.join(data_path, 'info_frames.npz'))
