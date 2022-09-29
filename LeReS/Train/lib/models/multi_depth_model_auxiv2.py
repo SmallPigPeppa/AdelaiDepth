@@ -20,12 +20,15 @@ class RelDepthModel(nn.Module):
     def forward(self, data, is_train=True):
         # Input data is a_real, predicted data is b_fake, groundtruth is b_real
         self.inputs = data['rgb'].cuda()
-        self.logit, self.auxi = self.depth_model(self.inputs)
+        # self.logit, self.auxi = self.depth_model(self.inputs)
+        self.logit = self.depth_model(self.inputs)
         if is_train:
             self.losses_dict = self.losses.criterion(self.logit, data)
         else:
             self.losses_dict = {'total_loss': torch.tensor(0.0, dtype=torch.float).cuda()}
-        return {'decoder': self.logit, 'auxi': self.auxi, 'losses': self.losses_dict}
+        # return {'decoder': self.logit, 'auxi': self.auxi, 'losses': self.losses_dict}
+
+        return {'decoder': self.logit, 'losses': self.losses_dict}
 
     def inference(self, data):
         with torch.no_grad():
@@ -168,13 +171,15 @@ class DepthModel(nn.Module):
         backbone = network.__name__.split('.')[-1] + '.' + cfg.MODEL.ENCODER
         self.encoder_modules = get_func(backbone)()
         self.decoder_modules = network.Decoder()
-        self.auxi_modules = network.AuxiNetV2()
+        # self.auxi_modules = network.AuxiNetV2()
 
     def forward(self, x):
         lateral_out = self.encoder_modules(x)
         out_logit, auxi_input = self.decoder_modules(lateral_out)
-        out_auxi = self.auxi_modules(auxi_input)
-        return out_logit, out_auxi
+        # out_auxi = self.auxi_modules(auxi_input)
+        # return out_logit, out_auxi
+
+        return out_logit
 
 
 def recover_scale_shift_depth(pred, gt, min_threshold=1e-8, max_threshold=1e8):
