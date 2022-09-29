@@ -47,7 +47,7 @@ def randomSampling(inputs, targets, masks, threshold, sample_num):
 # inputs_A, inputs_B, targets_A, targets_B, masks_A, masks_B
 ###########
 def ind2sub(idx, cols):
-    r = idx / cols
+    r = idx // cols
     c = idx - r * cols
     return r, c
 
