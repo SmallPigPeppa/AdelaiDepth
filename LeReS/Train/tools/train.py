@@ -193,7 +193,9 @@ def main_worker(local_rank: int, ngpus_per_node: int, train_args, val_args):
 
     if train_args.distributed:
         model = torch.nn.parallel.DistributedDataParallel(
-            model.cuda(), device_ids=[local_rank], output_device=local_rank,find_unused_parameters=True)
+            model.cuda(), device_ids=[local_rank], output_device=local_rank)
+        # model = torch.nn.parallel.DistributedDataParallel(
+        #     model.cuda(), device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True)
     else:
         model = torch.nn.DataParallel(model.cuda())
 
