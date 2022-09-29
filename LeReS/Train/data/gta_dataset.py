@@ -122,6 +122,9 @@ class GTADataset(Dataset):
         # joints_3d_world = np.load(os.path.join(self.data_path, 'info_frames.npz'))['joints_3d_world'][anno_index]
         # world2cam_trans = np.load(os.path.join(self.data_path, 'info_frames.npz'))['world2cam_trans'][anno_index]
         # intrinsics = np.load(os.path.join(self.data_path, 'info_frames.npz'))['intrinsics'][anno_index]
+        print("#############################debug############################")
+        print(self.info_npz)
+        print("#############################debug############################")
         joints_2d = self.info_npz['joints_2d'][anno_index]
         joints_3d_cam = self.info_npz['joints_3d_cam'][anno_index]
         joints_3d_world = self.info_npz['joints_3d_world'][anno_index]
