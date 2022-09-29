@@ -1,12 +1,12 @@
 export PYTHONPATH=../../Train:${PYTHONPATH}
 #export CUDA_VISIBLE_DEVICES=0
-
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 python ../tools/train.py \
 --dataset gta \
 --dataroot /share/wenzhuoliu/torch_ds/GTA-IM/FPS-5 \
 --backbone resnet50 \
 --dataset_list 2020-06-11-10-06-48 \
---batchsize 2 \
+--batchsize 16 \
 --base_lr 0.001 \
 --use_tfboard \
 --thread 4 \
