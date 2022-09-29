@@ -136,7 +136,7 @@ class GTADataset(Dataset):
         world2cam_trans = 0
         intrinsics = 0
         # focal_length = (intrinsics[0][0]).astype(np.float32)
-        focal_length = (10.).astype(np.float32)
+        focal_length = (np.array(10.)).astype(np.float32)
         depth, invalid_depth, sem_mask = self.load_training_data(anno_index)
 
         rgb_aug = self.rgb_aug(rgb)
