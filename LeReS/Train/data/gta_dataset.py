@@ -31,15 +31,18 @@ class GTADataset(Dataset):
         depth_paths = []
         rgb_paths = []
         mask_paths = []
-        keypoints = []
+        # keypoints = []
         cam_near_clips = []
         cam_far_clips = []
-        joints_2d = np.load(os.path.join(data_path, 'info_frames.npz'))['joints_2d']
+        self.joints_2d = np.load(os.path.join(data_path, 'info_frames.npz'))['joints_2d']
+        self.info_pkl = pickle.load(open(os.path.join(data_path, 'info_frames.pickle'), 'rb'))
+        self.info_npz = np.load(os.path.join(data_path, 'info_frames.npz'))
+        # joints_2d = np.load(os.path.join(data_path, 'info_frames.npz'))['joints_2d']
         info_pkl = pickle.load(open(os.path.join(data_path, 'info_frames.pickle'), 'rb'))
         info_npz = np.load(os.path.join(data_path, 'info_frames.npz'))
         for idx in range(0, len(info_pkl)):
             if os.path.exists(os.path.join(data_path, '{:05d}'.format(idx) + '.jpg')):
-                keypoint = joints_2d[idx]
+                # keypoint = joints_2d[idx]
                 rgb_path = os.path.join(data_path, '{:05d}'.format(idx) + '.jpg')
                 depth_path = os.path.join(data_path, '{:05d}'.format(idx) + '.png')
                 mask_path = os.path.join(data_path, '{:05d}'.format(idx) + '_id.png')
@@ -51,7 +54,7 @@ class GTADataset(Dataset):
                 else:
                     cam_far_clip = 800.
 
-                keypoints.append(keypoint)
+                # keypoints.append(keypoint)
                 rgb_paths.append(rgb_path)
                 depth_paths.append(depth_path)
                 mask_paths.append(mask_path)
@@ -115,16 +118,16 @@ class GTADataset(Dataset):
         rgb_path = self.rgb_paths[anno_index]
         depth_path = self.depth_paths[anno_index]
         rgb = cv2.imread(rgb_path)[:, :, ::-1]  # rgb, H*W*C
-        joints_2d = np.load(os.path.join(self.data_path, 'info_frames.npz'))['joints_2d'][anno_index]
-        joints_3d_cam = np.load(os.path.join(self.data_path, 'info_frames.npz'))['joints_3d_cam'][anno_index]
-        joints_3d_world = np.load(os.path.join(self.data_path, 'info_frames.npz'))['joints_3d_world'][anno_index]
-        world2cam_trans = np.load(os.path.join(self.data_path, 'info_frames.npz'))['world2cam_trans'][anno_index]
-        intrinsics = np.load(os.path.join(self.data_path, 'info_frames.npz'))['intrinsics'][anno_index]
-        # joints_2d = self.info_npz['joints_2d'][anno_index]
-        # joints_3d_cam = self.info_npz['joints_3d_cam'][anno_index]
-        # joints_3d_world = self.info_npz['joints_3d_world'][anno_index]
-        # world2cam_trans = self.info_npz['world2cam_trans'][anno_index]
-        # intrinsics = self.info_npz['intrinsics'][anno_index]
+        # joints_2d = np.load(os.path.join(self.data_path, 'info_frames.npz'))['joints_2d'][anno_index]
+        # joints_3d_cam = np.load(os.path.join(self.data_path, 'info_frames.npz'))['joints_3d_cam'][anno_index]
+        # joints_3d_world = np.load(os.path.join(self.data_path, 'info_frames.npz'))['joints_3d_world'][anno_index]
+        # world2cam_trans = np.load(os.path.join(self.data_path, 'info_frames.npz'))['world2cam_trans'][anno_index]
+        # intrinsics = np.load(os.path.join(self.data_path, 'info_frames.npz'))['intrinsics'][anno_index]
+        joints_2d = self.info_npz['joints_2d'][anno_index]
+        joints_3d_cam = self.info_npz['joints_3d_cam'][anno_index]
+        joints_3d_world = self.info_npz['joints_3d_world'][anno_index]
+        world2cam_trans = self.info_npz['world2cam_trans'][anno_index]
+        intrinsics = self.info_npz['intrinsics'][anno_index]
         focal_length = (intrinsics[0][0]).astype(np.float32)
         depth, invalid_depth, sem_mask = self.load_training_data(anno_index)
 
