@@ -257,6 +257,7 @@ def main():
         val_args.dataset_list.remove('Holopix50k')
 
     print('Using PyTorch version: ', torch.__version__, torch.version.cuda)
+    print('Using GPU nums: ', torch.cuda.device_count())
     ngpus_per_node = torch.cuda.device_count()
     train_args.world_size = ngpus_per_node * train_args.nnodes
     val_args.world_size = ngpus_per_node * train_args.nnodes
