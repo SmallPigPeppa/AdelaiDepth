@@ -150,62 +150,62 @@ class CustomerMultiDataSampler(torch.utils.data.Sampler):
 
 
 
-class CustomerMultiDataSamples(torch.utils.data.Sampler):
-    """
-    Construct a sample method. Sample former ratio_samples of datasets randomly.
-    """
-    def __init__(self, multi_data_indices, ratio_samples, opt, rank=None, num_replicas=None):
-        logger = logging.getLogger(__name__)
-
-        self.multi_data_indices = multi_data_indices
-        self.num_indices = np.array([len(i) for i in self.multi_data_indices])
-        self.num_samples = (self.num_indices * ratio_samples).astype(np.uint32)
-        self.max_indices = np.array([max(i) for i in self.multi_data_indices])
-        self.total_sampled_size = np.sum(self.num_samples)
-        self.phase = opt.phase
-        if num_replicas is None:
-            if not dist.is_available():
-                raise RuntimeError("Requires distributed package to be available")
-            num_replicas = dist.get_world_size()
-        self.num_replicas = num_replicas
-        if rank is None:
-            if not dist.is_available():
-                raise RuntimeError("Requires distributed package to be available")
-            rank = dist.get_rank()
-        self.rank = rank
-        self.num_dist_samples = int(math.ceil(self.total_sampled_size * 1.0 / self.num_replicas))
-        self.total_dist_size = self.num_dist_samples * self.num_replicas
-        logger.info('Sample %02f, sampled dataset sizes are %s' % (ratio_samples, ','.join(map(str, self.num_samples))))
-
-    def __iter__(self):
-        cum_sum = np.cumsum(np.append([0], self.max_indices))
-        if 'train' in self.phase:
-            indices_array = [[self.multi_data_indices[idx][i] + cum_sum[idx] for i in torch.randperm(int(num))] for
-                             idx, num in
-                             enumerate(self.num_samples)]
-        else:
-            indices_array = [[self.multi_data_indices[idx][i] + cum_sum[idx] for i in range(int(num))] for
-                             idx, num in enumerate(self.num_samples)]
-        if 'train' in self.phase:
-            # data list is reshaped in [A, B, C, A, B, C....]
-            indices_array = np.array(indices_array).transpose(1, 0).reshape(-1)
-        else:
-            indices_array = np.concatenate(indices_array[:])
-
-        # add extra samples to make it evenly divisible
-        diff_size = int(self.total_dist_size - self.total_sampled_size)
-        if diff_size > 0:
-            extended_indices_dist = np.append(indices_array, indices_array[:diff_size])
-        else:
-            extended_indices_dist = indices_array
-        assert extended_indices_dist.size == self.total_dist_size
-
-        # subsample
-        offset = self.num_dist_samples * self.rank
-        rank_indices = extended_indices_dist[offset: offset + self.num_dist_samples]
-        assert rank_indices.size == self.num_dist_samples
-
-        return iter(rank_indices)
+# class CustomerMultiDataSamples(torch.utils.data.Sampler):
+#     """
+#     Construct a sample method. Sample former ratio_samples of datasets randomly.
+#     """
+#     def __init__(self, multi_data_indices, ratio_samples, opt, rank=None, num_replicas=None):
+#         logger = logging.getLogger(__name__)
+#
+#         self.multi_data_indices = multi_data_indices
+#         self.num_indices = np.array([len(i) for i in self.multi_data_indices])
+#         self.num_samples = (self.num_indices * ratio_samples).astype(np.uint32)
+#         self.max_indices = np.array([max(i) for i in self.multi_data_indices])
+#         self.total_sampled_size = np.sum(self.num_samples)
+#         self.phase = opt.phase
+#         if num_replicas is None:
+#             if not dist.is_available():
+#                 raise RuntimeError("Requires distributed package to be available")
+#             num_replicas = dist.get_world_size()
+#         self.num_replicas = num_replicas
+#         if rank is None:
+#             if not dist.is_available():
+#                 raise RuntimeError("Requires distributed package to be available")
+#             rank = dist.get_rank()
+#         self.rank = rank
+#         self.num_dist_samples = int(math.ceil(self.total_sampled_size * 1.0 / self.num_replicas))
+#         self.total_dist_size = self.num_dist_samples * self.num_replicas
+#         logger.info('Sample %02f, sampled dataset sizes are %s' % (ratio_samples, ','.join(map(str, self.num_samples))))
+#
+#     def __iter__(self):
+#         cum_sum = np.cumsum(np.append([0], self.max_indices))
+#         if 'train' in self.phase:
+#             indices_array = [[self.multi_data_indices[idx][i] + cum_sum[idx] for i in torch.randperm(int(num))] for
+#                              idx, num in
+#                              enumerate(self.num_samples)]
+#         else:
+#             indices_array = [[self.multi_data_indices[idx][i] + cum_sum[idx] for i in range(int(num))] for
+#                              idx, num in enumerate(self.num_samples)]
+#         if 'train' in self.phase:
+#             # data list is reshaped in [A, B, C, A, B, C....]
+#             indices_array = np.array(indices_array).transpose(1, 0).reshape(-1)
+#         else:
+#             indices_array = np.concatenate(indices_array[:])
+#
+#         # add extra samples to make it evenly divisible
+#         diff_size = int(self.total_dist_size - self.total_sampled_size)
+#         if diff_size > 0:
+#             extended_indices_dist = np.append(indices_array, indices_array[:diff_size])
+#         else:
+#             extended_indices_dist = indices_array
+#         assert extended_indices_dist.size == self.total_dist_size
+#
+#         # subsample
+#         offset = self.num_dist_samples * self.rank
+#         rank_indices = extended_indices_dist[offset: offset + self.num_dist_samples]
+#         assert rank_indices.size == self.num_dist_samples
+#
+#         return iter(rank_indices)
 
 
 def create_dataset(opt):
