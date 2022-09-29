@@ -2,7 +2,7 @@ export PYTHONPATH=../../Train:${PYTHONPATH}
 #export CUDA_VISIBLE_DEVICES=0
 #export CUDA_VISIBLE_DEVICES=0,1,2,3
 python ../tools/train.py \
---dataset gta \
+--dataroot datasets \
 --backbone resnet50 \
 --dataset_list demo \
 --batchsize 16 \
